@@ -1,8 +1,67 @@
 use std::cmp::Ordering;
+use std::cmp;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::File;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ordered() {
+        let input = String::from("[1518-11-01 00:00] Guard #10 begins shift\n\
+                                  [1518-11-01 00:05] falls asleep\n\
+                                  [1518-11-01 00:25] wakes up\n\
+                                  [1518-11-01 00:30] falls asleep\n\
+                                  [1518-11-01 00:55] wakes up\n\
+                                  [1518-11-01 23:58] Guard #99 begins shift\n\
+                                  [1518-11-02 00:40] falls asleep\n\
+                                  [1518-11-02 00:50] wakes up\n\
+                                  [1518-11-03 00:05] Guard #10 begins shift\n\
+                                  [1518-11-03 00:24] falls asleep\n\
+                                  [1518-11-03 00:29] wakes up\n\
+                                  [1518-11-04 00:02] Guard #99 begins shift\n\
+                                  [1518-11-04 00:36] falls asleep\n\
+                                  [1518-11-04 00:46] wakes up\n\
+                                  [1518-11-05 00:03] Guard #99 begins shift\n\
+                                  [1518-11-05 00:45] falls asleep\n\
+                                  [1518-11-05 00:55] wakes up");
+        let log = parse_input(input);
+        let guard_naps = parse_log(log);
+        let guard_naps_by_minute = naps_by_minute(guard_naps);
+        assert_eq!(get_sleepiest_guard(&guard_naps_by_minute), (10, 24));
+        assert_eq!(get_reliable_guard(&guard_naps_by_minute), (99, 45));
+    }
+
+    #[test]
+    fn test_unordered() {
+        let input = String::from("[1518-11-04 00:36] falls asleep\n\
+                                  [1518-11-04 00:46] wakes up\n\
+                                  [1518-11-01 00:30] falls asleep\n\
+                                  [1518-11-01 00:00] Guard #10 begins shift\n\
+                                  [1518-11-01 00:05] falls asleep\n\
+                                  [1518-11-01 00:25] wakes up\n\
+                                  [1518-11-01 00:55] wakes up\n\
+                                  [1518-11-03 00:24] falls asleep\n\
+                                  [1518-11-03 00:29] wakes up\n\
+                                  [1518-11-05 00:03] Guard #99 begins shift\n\
+                                  [1518-11-01 23:58] Guard #99 begins shift\n\
+                                  [1518-11-02 00:40] falls asleep\n\
+                                  [1518-11-02 00:50] wakes up\n\
+                                  [1518-11-03 00:05] Guard #10 begins shift\n\
+                                  [1518-11-04 00:02] Guard #99 begins shift\n\
+                                  [1518-11-05 00:45] falls asleep\n\
+                                  [1518-11-05 00:55] wakes up");
+        let log = parse_input(input);
+        let guard_naps = parse_log(log);
+        let guard_naps_by_minute = naps_by_minute(guard_naps);
+        assert_eq!(get_sleepiest_guard(&guard_naps_by_minute), (10, 24));
+        assert_eq!(get_reliable_guard(&guard_naps_by_minute), (99, 45));
+    }
+}
+
 
 #[derive(Debug, Copy, Clone, Eq)]
 struct Date {
@@ -15,23 +74,11 @@ struct Date {
 
 impl Ord for Date {
     fn cmp(&self, other: &Date) -> Ordering {
-        let mut comp = self.year.cmp(&other.year);
-        if comp != Ordering::Equal {
-            return comp;
-        }
-        comp = self.month.cmp(&other.month);
-        if comp != Ordering::Equal {
-            return comp;
-        }
-        comp = self.day.cmp(&other.day);
-        if comp != Ordering::Equal {
-            return comp;
-        }
-        comp = self.hour.cmp(&other.hour);
-        if comp != Ordering::Equal {
-            return comp;
-        }
-        self.minute.cmp(&other.minute)
+        self.year.cmp(&other.year)
+            .then(self.month.cmp(&other.month))
+            .then(self.day.cmp(&other.day))
+            .then(self.hour.cmp(&other.hour))
+            .then(self.minute.cmp(&other.minute))
     }
 }
 
@@ -118,47 +165,42 @@ fn parse_log_line(line : &str) -> LogEntry {
     LogEntry { event: event, timestamp: timestamp }
 }
 
-fn main() {
-    let mut input = String::new();
-    let mut f = File::open("input").expect("Failed to open input.");
-    f.read_to_string(&mut input).expect("Failed to read input.");
-
+fn parse_input(input: String) -> BTreeSet<LogEntry> {
     let lines : Vec<&str> = input.trim()
-                                .split("\n")
-                                .map(|x| x.trim())
-                                .collect();
-
+                                 .split("\n")
+                                 .map(|x| x.trim())
+                                 .collect();
     let mut log = BTreeSet::new();
-
     for line in lines {
         log.insert(parse_log_line(line));
     }
+    log
+}
 
+fn parse_log(log: BTreeSet<LogEntry>) -> HashMap<u32, Vec<TimeRange>> {
     let mut guard_naps = HashMap::new();
-
-    let mut on_duty: u32 = 0;
-    let mut sleep_start: Date = Date {year: 0, month: 0, day: 0, hour: 0, minute: 0};
+    let mut on_duty = None;
+    let mut sleep_start = None;
     for entry in log {
         match entry.event {
-            LogEvent::FallAsleep => sleep_start = entry.timestamp,
-            LogEvent::WakeUp => guard_naps.entry(on_duty)
-                                          .or_insert(Vec::new())
-                                          .push(TimeRange { start : sleep_start, end: entry.timestamp}),
-            LogEvent::StartShift(guard) => on_duty = guard,
+            LogEvent::FallAsleep => sleep_start = Some(entry.timestamp),
+            LogEvent::WakeUp =>
+                guard_naps.entry(on_duty.expect("No guard on duty at wake up"))
+                          .or_insert(Vec::new())
+                          .push(TimeRange {start : sleep_start
+                                .expect("Woke up from nonexistent nap"),
+                                end: entry.timestamp}),
+            LogEvent::StartShift(guard) => on_duty = Some(guard)
         }
     }
+    guard_naps
+}
 
-    let mut max_napper = 0;
-    let mut max_naps = 0;
-    let mut sleepiest_minute = 0;
-
-    let mut most_reliable_napper = 0;
-    let mut most_reliable_naps = 0;
-    let mut most_reliable_minute = 0;
-
+fn naps_by_minute(guard_naps: HashMap<u32, Vec<TimeRange>>)
+    -> HashMap<u32, Vec<i32>> {
     let mut guard_naps_by_minute = HashMap::new();
     for (guard, naps) in guard_naps {
-        guard_naps_by_minute.insert(guard, [0; 60]);
+        guard_naps_by_minute.insert(guard, vec![0 as i32; 60]);
 
         let mut full_hours = 0;
         for nap in naps {
@@ -174,31 +216,58 @@ fn main() {
             full_hours += nap.end.hour - nap.start.hour;
         }
 
-        let mut total_guard_naps = 0;
-        let mut most_napped_minute = 0;
-        let mut most_naps_in_minute = 0;
         for i in 0..60 {
-            guard_naps_by_minute.get_mut(&guard).unwrap()[i as usize] += full_hours;
-            total_guard_naps += guard_naps_by_minute[&guard][i as usize];
-            if guard_naps_by_minute[&guard][i as usize] > most_naps_in_minute {
-                most_napped_minute = i;
-                most_naps_in_minute = guard_naps_by_minute[&guard][i as usize];
-            }
-        }
-
-        if total_guard_naps > max_naps {
-            max_naps = total_guard_naps;
-            max_napper = guard;
-            sleepiest_minute = most_napped_minute;
-        }
-
-        if most_naps_in_minute > most_reliable_naps {
-            most_reliable_napper = guard;
-            most_reliable_naps = most_naps_in_minute;
-            most_reliable_minute = most_napped_minute;
+            guard_naps_by_minute.get_mut(&guard).unwrap()[i as usize]
+                += full_hours as i32;
         }
     }
+    guard_naps_by_minute
+}
 
-    println!("Part 1: {}, Part 2: {}", max_napper*sleepiest_minute, most_reliable_napper*most_reliable_minute);
+fn get_sleepiest_guard(npm: &HashMap<u32, Vec<i32>>) -> (u32, u32) {
+    let mut max_naps = (0, 0);
+    for (guard, minutes) in npm {
+        let total_naps = minutes.iter().sum();
+        max_naps = cmp::max(max_naps, (total_naps, *guard))
+    }
+
+    let sleepiest_guard = max_naps.1;
+    let mut sleepiest_minute = (0, 0);
+    for i in 0..60 {
+        sleepiest_minute = cmp::max((npm[&sleepiest_guard][i], i),
+                                    sleepiest_minute);
+    }
+    (sleepiest_guard, sleepiest_minute.1 as u32)
+}
+
+fn get_reliable_guard(npm: &HashMap<u32, Vec<i32>>) -> (u32, u32) {
+    let mut sleepiest_guard = (0, 0, 0);
+    for (guard, minutes) in npm {
+        let mut sleepiest_minute = (0, 0);
+        for i in 0..60 {
+            sleepiest_minute = cmp::max((minutes[i], i), sleepiest_minute);
+        }
+        let this_guard = (sleepiest_minute.0, sleepiest_minute.1 as u32, *guard);
+        sleepiest_guard = cmp::max(sleepiest_guard, this_guard);
+    }
+    (sleepiest_guard.2, sleepiest_guard.1)
+}
+
+fn main() {
+    let mut input = String::new();
+    let mut f = File::open("input").expect("Failed to open input.");
+    f.read_to_string(&mut input).expect("Failed to read input.");
+
+    let log = parse_input(input);
+    let guard_naps = parse_log(log);
+
+    let guard_naps_by_minute = naps_by_minute(guard_naps);
+    let (sleepiest_guard, sleepiest_minute)
+        = get_sleepiest_guard(&guard_naps_by_minute);
+    let (reliable_guard, reliable_minute)
+        = get_reliable_guard(&guard_naps_by_minute);
+
+    println!("Part 1: {}, Part 2: {}", sleepiest_guard*sleepiest_minute,
+                                       reliable_guard*reliable_minute);
 }
 

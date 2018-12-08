@@ -2,6 +2,19 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::slice::Iter;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_both_halves() {
+        let input = String::from("2 3 0 3 10 11 12 1 1 0 1 99 2 1 1 2\n");
+        let tokens = parse_input(input);
+        assert_eq!(metadata_sum(&mut tokens.iter()), 138);
+        assert_eq!(node_value(&mut tokens.iter()), 66);
+    }
+}
+
 fn metadata_sum(tokens: &mut Iter<u32>) -> u32 {
 	let mut sum = 0;
 	let child_nodes = *tokens.next().unwrap();
@@ -44,18 +57,18 @@ fn node_value(tokens: &mut Iter<u32>) -> u32 {
 	sum
 }
 
+fn parse_input(input: String) -> Vec<u32> {
+	input.trim().split(" ")
+                .map(|x| x.parse::<u32>().unwrap())
+                .collect()
+}
+
 fn main() {
     let mut input = String::new();
     let mut f = File::open("input").expect("Failed to open input.");
     f.read_to_string(&mut input).expect("Failed to read input.");
 
-    let tokens: Vec<u32> = input.trim().split(" ")
-                                .map(|x| x.parse::<u32>().unwrap())
-                                .collect();
-
-    let sum = metadata_sum(&mut tokens.iter());
-    println!("Sum of metadata: {}", sum);
-
-    let value = node_value(&mut tokens.iter());
-    println!("Value of first node: {}", value);
+    let tokens = parse_input(input);
+    println!("Sum of metadata: {}", metadata_sum(&mut tokens.iter()));
+    println!("Value of first node: {}", node_value(&mut tokens.iter()));
 }
