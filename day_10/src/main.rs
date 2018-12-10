@@ -13,83 +13,55 @@ struct Point {
 mod tests {
     use super::*;
 
+    const TEST_INPUT: &str = "position=<     9,      1> velocity=< 0,  2>\n\
+	                          position=<     7,      0> velocity=<-1,  0>\n\
+	                          position=<     3,     -2> velocity=<-1,  1>\n\
+	                          position=<     6,     10> velocity=<-2, -1>\n\
+	                          position=<     2,     -4> velocity=< 2,  2>\n\
+	                          position=<    -6,     10> velocity=< 2, -2>\n\
+	                          position=<     1,      8> velocity=< 1, -1>\n\
+	                          position=<     1,      7> velocity=< 1,  0>\n\
+	                          position=<    -3,     11> velocity=< 1, -2>\n\
+	                          position=<     7,      6> velocity=<-1, -1>\n\
+	                          position=<    -2,      3> velocity=< 1,  0>\n\
+	                          position=<    -4,      3> velocity=< 2,  0>\n\
+	                          position=<    10,     -3> velocity=<-1,  1>\n\
+	                          position=<     5,     11> velocity=< 1, -2>\n\
+	                          position=<     4,      7> velocity=< 0, -1>\n\
+	                          position=<     8,     -2> velocity=< 0,  1>\n\
+	                          position=<    15,      0> velocity=<-2,  0>\n\
+	                          position=<     1,      6> velocity=< 1,  0>\n\
+	                          position=<     8,      9> velocity=< 0, -1>\n\
+	                          position=<     3,      3> velocity=<-1,  1>\n\
+	                          position=<     0,      5> velocity=< 0, -1>\n\
+	                          position=<    -2,      2> velocity=< 2,  0>\n\
+	                          position=<     5,     -2> velocity=< 1,  2>\n\
+	                          position=<     1,      4> velocity=< 2,  1>\n\
+	                          position=<    -2,      7> velocity=< 2, -2>\n\
+	                          position=<     3,      6> velocity=<-1, -1>\n\
+	                          position=<     5,      0> velocity=< 1,  0>\n\
+	                          position=<    -6,      0> velocity=< 2,  0>\n\
+	                          position=<     5,      9> velocity=< 1, -2>\n\
+	                          position=<    14,      7> velocity=<-2,  0>\n\
+	                          position=<    -3,      6> velocity=< 2, -1>";
+
     #[test]
     fn test_first_half() {
-	    let input = String::from("position=<     9,      1> velocity=< 0,  2>\n\
-	                              position=<     7,      0> velocity=<-1,  0>\n\
-	                              position=<     3,     -2> velocity=<-1,  1>\n\
-	                              position=<     6,     10> velocity=<-2, -1>\n\
-	                              position=<     2,     -4> velocity=< 2,  2>\n\
-	                              position=<    -6,     10> velocity=< 2, -2>\n\
-	                              position=<     1,      8> velocity=< 1, -1>\n\
-	                              position=<     1,      7> velocity=< 1,  0>\n\
-	                              position=<    -3,     11> velocity=< 1, -2>\n\
-	                              position=<     7,      6> velocity=<-1, -1>\n\
-	                              position=<    -2,      3> velocity=< 1,  0>\n\
-	                              position=<    -4,      3> velocity=< 2,  0>\n\
-	                              position=<    10,     -3> velocity=<-1,  1>\n\
-	                              position=<     5,     11> velocity=< 1, -2>\n\
-	                              position=<     4,      7> velocity=< 0, -1>\n\
-	                              position=<     8,     -2> velocity=< 0,  1>\n\
-	                              position=<    15,      0> velocity=<-2,  0>\n\
-	                              position=<     1,      6> velocity=< 1,  0>\n\
-	                              position=<     8,      9> velocity=< 0, -1>\n\
-	                              position=<     3,      3> velocity=<-1,  1>\n\
-	                              position=<     0,      5> velocity=< 0, -1>\n\
-	                              position=<    -2,      2> velocity=< 2,  0>\n\
-	                              position=<     5,     -2> velocity=< 1,  2>\n\
-	                              position=<     1,      4> velocity=< 2,  1>\n\
-	                              position=<    -2,      7> velocity=< 2, -2>\n\
-	                              position=<     3,      6> velocity=<-1, -1>\n\
-	                              position=<     5,      0> velocity=< 1,  0>\n\
-	                              position=<    -6,      0> velocity=< 2,  0>\n\
-	                              position=<     5,      9> velocity=< 1, -2>\n\
-	                              position=<    14,      7> velocity=<-2,  0>\n\
-	                              position=<    -3,      6> velocity=< 2, -1>");
+	    let input = String::from(TEST_INPUT);
 	    let mut points = parse_input(input);
-	    assert_eq!(find_min_area(&mut points), 3);
+	    assert_eq!(find_min_area(&mut points, 2), 3);
 	    print_points(&points);
 	}
 
 	#[test]
 	fn test_simulate_step() {
-	    let input = String::from("position=<     9,      1> velocity=< 0,  2>\n\
-	                              position=<     7,      0> velocity=<-1,  0>\n\
-	                              position=<     3,     -2> velocity=<-1,  1>\n\
-	                              position=<     6,     10> velocity=<-2, -1>\n\
-	                              position=<     2,     -4> velocity=< 2,  2>\n\
-	                              position=<    -6,     10> velocity=< 2, -2>\n\
-	                              position=<     1,      8> velocity=< 1, -1>\n\
-	                              position=<     1,      7> velocity=< 1,  0>\n\
-	                              position=<    -3,     11> velocity=< 1, -2>\n\
-	                              position=<     7,      6> velocity=<-1, -1>\n\
-	                              position=<    -2,      3> velocity=< 1,  0>\n\
-	                              position=<    -4,      3> velocity=< 2,  0>\n\
-	                              position=<    10,     -3> velocity=<-1,  1>\n\
-	                              position=<     5,     11> velocity=< 1, -2>\n\
-	                              position=<     4,      7> velocity=< 0, -1>\n\
-	                              position=<     8,     -2> velocity=< 0,  1>\n\
-	                              position=<    15,      0> velocity=<-2,  0>\n\
-	                              position=<     1,      6> velocity=< 1,  0>\n\
-	                              position=<     8,      9> velocity=< 0, -1>\n\
-	                              position=<     3,      3> velocity=<-1,  1>\n\
-	                              position=<     0,      5> velocity=< 0, -1>\n\
-	                              position=<    -2,      2> velocity=< 2,  0>\n\
-	                              position=<     5,     -2> velocity=< 1,  2>\n\
-	                              position=<     1,      4> velocity=< 2,  1>\n\
-	                              position=<    -2,      7> velocity=< 2, -2>\n\
-	                              position=<     3,      6> velocity=<-1, -1>\n\
-	                              position=<     5,      0> velocity=< 1,  0>\n\
-	                              position=<    -6,      0> velocity=< 2,  0>\n\
-	                              position=<     5,      9> velocity=< 1, -2>\n\
-	                              position=<    14,      7> velocity=<-2,  0>\n\
-	                              position=<    -3,      6> velocity=< 2, -1>");
+	    let input = String::from(TEST_INPUT);
 	    let mut points = parse_input(input);
-	    let old_entropy = entropy(&points);
+	    let old_area = bb_area(&points);
 	    for steps in vec![1024, 100, 300, 255, 10] {
 			simulate(&mut points, steps);
 			simulate(&mut points, -steps);
-			assert_eq!(old_entropy, entropy(&points));
+			assert_eq!(old_area, bb_area(&points));
 	    }
 	}
 }
@@ -134,23 +106,26 @@ fn simulate(points: &mut Vec<Point>, steps: isize) {
 	}
 }
 
-fn find_min_area(points: &mut Vec<Point>) -> isize {
+fn find_min_area(points: &mut Vec<Point>, initial_step_size: isize) -> isize {
 	let mut time = 0;
-	let mut step = 1024*4;
+	let mut step = initial_step_size;
 	let mut max_reached = false;
 	loop {
 		time += step;
-		simulate(points, step-1);
-		let area_back = bb_area(points);
-		simulate(points, 2);
+		simulate(points, step+1);
 		let area_fwd = bb_area(points);
-		simulate(points, -1);
+		simulate(points, -2);
+		let area_back = bb_area(points);
+		simulate(points, 1);
 		let area_at = bb_area(points);
-		match (area_at < area_back, area_at < area_fwd) {
+		match (area_at <= area_back, area_at <= area_fwd) {
 			(true, true) => break, // local minima
-			(true, false) => if max_reached { step = -step/2; }, // minima towards the future
-			(false, true) => { max_reached = true;  step = -step/2; }, // minima towards the past
+			(true, false) => if max_reached { step = step.abs()/2; }, // minima towards the future
+			(false, true) => { max_reached = true;  step = -step.abs()/2; }, // minima towards the past
 			(false, false) => panic!("Reached a local maxima"),
+		}
+		if step == 1 {
+			break;
 		}
 	}
 	time
@@ -183,6 +158,6 @@ fn main() {
     f.read_to_string(&mut input).expect("Failed to read input.");
 
     let mut points = parse_input(input);
-    println!("Stop time: {}", find_min_area(&mut points));
+    println!("Stop time: {}", find_min_area(&mut points, 2048));
     print_points(&points);
 }
