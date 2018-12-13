@@ -30,7 +30,6 @@ mod tests {
 
         for _ in 0..20 {
             pots.evolve(&rules);
-            pots.print();
         }
 
         assert_eq!(pots.sum_plants(), 325);
@@ -44,17 +43,6 @@ struct Pots {
 }
 
 impl Pots {
-
-    fn print(&self) {
-        for live in self.living.iter() {
-            if *live {
-                print!("#");
-            } else {
-                print!(".");
-            }
-        }
-        print!("\n");
-    }
 
     fn evolve(&mut self, rules: &[bool; 32]) {
 
