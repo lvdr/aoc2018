@@ -1,6 +1,6 @@
 use std::io::prelude::*;
 use std::fs::File;
-use std::collections::HashSet;
+use std::collections::VecDeque;
 
 #[cfg(test)]
 mod tests {
@@ -29,93 +29,101 @@ mod tests {
         let (mut pots, rules) = parse_input(input);
 
         for _ in 0..20 {
-            evolve(&mut pots, &rules);
+            pots.evolve(&rules);
+            pots.print();
         }
 
-        assert_eq!(sum_plants(&pots), 325);
+        assert_eq!(pots.sum_plants(), 325);
     }
 }
 
 #[derive(Debug, Clone)]
 struct Pots {
-    positive: Vec<bool>,
-    negative: Vec<bool>,
+    living: VecDeque<bool>,
+    offset: isize,
 }
 
-fn get(pots: &Pots, pos: isize) -> bool {
-    if pos >= 0 {
-        let idx = pos as usize;
-        if idx >= pots.positive.len() {
-            false
+impl Pots {
+
+    fn print(&self) {
+        for live in self.living.iter() {
+            if *live {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        print!("\n");
+    }
+
+    fn evolve(&mut self, rules: &[bool; 32]) {
+
+        let mut leftmost = 0;        
+        for i in 0..self.living.len()-2 {
+            leftmost = leftmost*2 + self.living[i+2] as usize;
+            self.living[i] = rules[leftmost];
+            leftmost &= 0b1111;
+        }
+
+        if !self.living[0] && !self.living[1] && !self.living[2] {
+            while !self.living[2] {
+                self.living.pop_front();
+                self.offset += 1;
+            }
         } else {
-            pots.positive[pos as usize]
+            while self.living[0] || self.living[1] {
+                self.living.push_front(false);
+                self.offset -= 1;
+            }
         }
-    } else {
-        pots.negative[(-pos-1) as usize]
-    }
-}
 
-fn set(pots: &mut Pots, pos: isize, value: bool) {
-    if pos >= 0 {
-        pots.positive[pos as usize] = value;
-    } else {
-        pots.negative[(-pos-1) as usize] = value;
-    }
-}
+        for i in 0..4 {
+            if self.living[self.living.len()-1-i] {
+                for _ in 0..4-i {
+                    self.living.push_back(false);
+                }
+                break;
+            }
+        }
 
-fn evolve(pots: &mut Pots, rules: &HashSet<u32>) {
-    let min = -(pots.negative.len() as isize);
-    let max = pots.positive.len() as isize;
-
-    let mut leftmost = 0;
-    for i in min..max {
-        let neighbors = leftmost*2 + get(pots, i+2) as u32;
-        set(pots, i, rules.contains(&neighbors));
-        leftmost = neighbors & 0b1111;
-    }
-
-    if pots.negative[(-min-1) as usize] {
-        pots.negative.append(&mut vec![false, false]);
-    } else if pots.negative[(-min-2) as usize] {
-        pots.negative.push(false);
-    }
-
-    if pots.positive[(max-1) as usize] {
-        pots.positive.append(&mut vec![false, false]);
-    } else if pots.positive[(max-2) as usize] {
-        pots.positive.push(false);
-    }
-}
-
-fn sum_plants(pots: &Pots) -> i64 {
-    let min = -(pots.negative.len() as isize);
-    let max = pots.positive.len() as isize;
-
-    let mut sum: i64 = 0;
-    for i in min..max {
-        if get(pots, i) {
-            sum += i;
+        while !self.living[self.living.len()-5] {
+            self.living.pop_back();
         }
     }
-    sum as i64
+
+    fn sum_plants(&self) -> i64 {
+        let mut sum: i64 = 0;
+        for i in 0..self.living.len() {
+            if self.living[i] {
+                sum += (i as isize + self.offset) as i64;
+            }
+        }
+        sum
+    }
 }
 
-fn parse_input(input: String) -> (Pots, HashSet<u32>) {
+fn parse_input(input: String) -> (Pots, [bool; 32]) {
     let mut lines = input.lines();
 
-    let mut initial_state: Vec<bool> = lines.next().unwrap()
-                                            .split(' ').nth(2)
-                                            .unwrap().trim()
-                                            .bytes().map(|b| b == '#' as u8)
-                                            .collect();
-    initial_state.append(&mut vec![false, false]);
+    let initial_state: VecDeque<bool> = lines.next().unwrap()
+                                             .split(' ').nth(2)
+                                             .unwrap().trim()
+                                             .bytes().map(|b| b == '#' as u8)
+                                             .collect();
 
-    // extend vectors so that lookup is easier
-    let pots = Pots{ positive: initial_state,
-                     negative: vec![false, false] };
+    let mut pots = Pots{ living: initial_state, offset: -2 };
+
+    for _ in 0..4 {
+        pots.living.push_back(false);
+    }
+
+    pots.living.push_front(false);
+    pots.living.push_front(false);
+
+
     lines.next();
 
-    let mut rules = HashSet::new();
+    let mut rules = [false; 32];
     for line in lines {
         let line = line.trim();
         if line.is_empty() {
@@ -136,7 +144,7 @@ fn parse_input(input: String) -> (Pots, HashSet<u32>) {
                 byte_val |= 0b1;
             }
         }
-        rules.insert(byte_val);
+        rules[byte_val] = true;
     }
     (pots, rules)
 }
@@ -149,15 +157,14 @@ fn main() {
     let (mut pots, rules) = parse_input(input);
 
     for _ in 0..20 {
-        evolve(&mut pots, &rules);
+        pots.evolve(&rules);
     }
 
-    println!("Value after 20 steps: {}", sum_plants(&pots));
+    println!("Value after 20 steps: {}", pots.sum_plants());
 
-
-    for _ in 20..50000000000 as u64 {
-        evolve(&mut pots, &rules);
+    for _ in 20u64..50_000_000_000u64 {
+        pots.evolve(&rules);
     }
 
-    println!("Value after 50000000000 steps: {}", sum_plants(&pots));
+    println!("Value after 50_000_000_000 steps: {}", pots.sum_plants());
 }
