@@ -21,7 +21,9 @@ mod tests {
         let input = String::from(TEST_INPUT);
         let (mut tiles, y_range) = parse_input(input);
         add_spring(&mut tiles, (500, 0), y_range.1);
-        assert_eq!(count_water(&tiles, y_range), 57);
+        print_state(&tiles, y_range, (493, 507));
+        assert_eq!(count_water(&tiles, y_range, true), 57);
+        assert_eq!(count_water(&tiles, y_range, false), 29);
     }
 
 
@@ -36,8 +38,8 @@ mod tests {
         let input = String::from(TEST_INPUT_2);
         let (mut tiles, y_range) = parse_input(input);
         add_spring(&mut tiles, (500, 0), y_range.1);
-        print_state(&tiles, y_range);
-        assert_eq!(count_water(&tiles, y_range), 60);
+        print_state(&tiles, y_range, (493, 507));
+        assert_eq!(count_water(&tiles, y_range, true), 60);
     }
 
 
@@ -54,8 +56,29 @@ mod tests {
         let input = String::from(TEST_INPUT_3);
         let (mut tiles, y_range) = parse_input(input);
         add_spring(&mut tiles, (500, 0), y_range.1);
-        print_state(&tiles, y_range);
-        assert_eq!(count_water(&tiles, y_range), 58);
+        print_state(&tiles, y_range, (493, 507));
+        assert_eq!(count_water(&tiles, y_range, true), 58);
+    }
+
+
+
+    fn print_state(tiles: &HashMap<Pos, Tile>, y_range: (u32, u32),
+                   x_range: (u32, u32)) {
+        print!("\n");
+        for y in y_range.0..y_range.1 + 1 {
+            for x in x_range.0..x_range.1 + 1 {
+                if tiles.contains_key(&(x,y)) {
+                    match tiles[&(x,y)] {
+                        Tile::Clay => print!("#"),
+                        Tile::RunningWater => print!("|"),
+                        Tile::StillWater => print!("~"),
+                    }
+                } else {
+                    print!(".");
+                }
+            }
+            print!("\n");
+        }
     }
 }
 
@@ -105,11 +128,13 @@ fn parse_input(input: String) -> (HashMap<Pos, Tile>, (u32, u32)) {
     (tiles, (min_y, max_y))
 }
 
-fn count_water(tiles: &HashMap<Pos, Tile>, y_range: (u32, u32)) -> u32 {
+fn count_water(tiles: &HashMap<Pos, Tile>, y_range: (u32, u32),
+               count_running: bool) -> u32 {
     let mut count = 0;
     for (pos, tile) in tiles {
         if pos.1 >= y_range.0 && pos.1 <= y_range.1 &&
-           *tile != Tile::Clay {
+           (*tile == Tile::RunningWater && count_running ||
+            *tile == Tile::StillWater ) {
             count += 1;
         }
     }
@@ -138,7 +163,9 @@ fn fill_basin(tiles: &mut HashMap<Pos, Tile>, pos: (u32, u32), y_max: u32) {
                     x_max = inspect.0;
                     break;
                 }
-                if tiles[&down] == Tile::Clay {
+
+                let diag = (right.0, right.1 + 1);
+                if tiles[&diag] == Tile::RunningWater {
                     top = true;
                     x_max = inspect.0;
                     break;
@@ -154,6 +181,7 @@ fn fill_basin(tiles: &mut HashMap<Pos, Tile>, pos: (u32, u32), y_max: u32) {
             let left = (inspect.0 - 1, inspect.1);
             if !tiles.contains_key(&down) {
                 add_spring(tiles, inspect, y_max);
+
                 if !tiles.contains_key(&left) {
                     top = true;
                     x_min = inspect.0;
@@ -166,7 +194,9 @@ fn fill_basin(tiles: &mut HashMap<Pos, Tile>, pos: (u32, u32), y_max: u32) {
                     x_min = inspect.0;
                     break;
                 }
-                if tiles[&down] == Tile::Clay {
+
+                let diag = (left.0, left.1 + 1);
+                if tiles[&diag] == Tile::RunningWater {
                     top = true;
                     x_min = inspect.0;
                     break;
@@ -206,23 +236,6 @@ fn add_spring(tiles: &mut HashMap<Pos, Tile>, pos: (u32, u32), y_max: u32) {
     }
 }
 
-fn print_state(tiles: &HashMap<Pos, Tile>, range: (u32, u32)) {
-    for y in range.0..range.1 + 1 {
-        for x in 450..551 {
-            if tiles.contains_key(&(x,y)) {
-                match tiles[&(x,y)] {
-                    Tile::Clay => print!("#"),
-                    Tile::RunningWater => print!("|"),
-                    Tile::StillWater => print!("~"),
-                }
-            } else {
-                print!(".");
-            }
-        }
-        print!("\n");
-    }
-}
-
 fn main() {
     let mut input = String::new();
     let mut f = File::open("input").expect("Failed to open input.");
@@ -232,7 +245,8 @@ fn main() {
 
     //print_state(&tiles, y_range);
     add_spring(&mut tiles, (500, 0), y_range.1);
-    let water = count_water(&tiles, y_range);
-    print_state(&tiles, y_range);
+    let water = count_water(&tiles, y_range, true);
     println!("{} water tiles", water);
+    let still = count_water(&tiles, y_range, false);
+    println!("{} stillwater tiles", still);
 }
