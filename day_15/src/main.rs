@@ -26,11 +26,52 @@ mod tests {
                  #...E.#\n\
                  #######";
 
+    const TEST_INPUT_3: &str = 
+                "#######\n\
+                 #E..EG#\n\
+                 #.#G.E#\n\
+                 #E.##E#\n\
+                 #G..#.#\n\
+                 #..E#.#\n\
+                 #######";
+
+    const TEST_INPUT_4: &str = 
+                "#######\n\
+                 #E.G#.#\n\
+                 #.#G..#\n\
+                 #G.#.G#\n\
+                 #G..#.#\n\
+                 #...E.#\n\
+                 #######";
+
+    const TEST_INPUT_5: &str = 
+                "#######\n\
+                 #.E...#\n\
+                 #.#..G#\n\
+                 #.###.#\n\
+                 #E#G#G#\n\
+                 #...#G#\n\
+                 #######";
+
+    const TEST_INPUT_6: &str = 
+                "#########\n\
+                 #G......#\n\
+                 #.E.#...#\n\
+                 #..##..G#\n\
+                 #...##..#\n\
+                 #...#...#\n\
+                 #.G...G.#\n\
+                 #.....G.#\n\
+                 #########";
 
     #[test]
     fn test_first_half() {
         //test_resolution(TEST_INPUT_1, (47, 590));
-        test_resolution(TEST_INPUT_2, (37, 982));
+        //test_resolution(TEST_INPUT_2, (37, 982));
+        //test_resolution(TEST_INPUT_3, (46, 859));
+        test_resolution(TEST_INPUT_4, (35, 793));
+        //test_resolution(TEST_INPUT_5, (54, 536));
+        //test_resolution(TEST_INPUT_6, (20, 937));
     }
 
     fn test_resolution(input: &str, expected: (u32, i32)) {
@@ -90,32 +131,90 @@ impl GridPos {
     }
 
     fn pathfind(self, other: GridPos, walls: &Vec<Vec<bool>>,
-                units: &HashSet<GridPos>) -> usize {
+                units: &HashMap<GridPos, bool>) -> GridPos {
+        // Dijkstra's since I'm feeling lazy
+        let mut frontier = VecDeque::new();
+        let mut explored = HashSet::new();
+
+        for i in 0..4 {
+            let step = self.adjacent(i);
+            if walls[step.y][step.x]
+               || units.contains_key(&step) {
+                continue;
+            }
+
+            if step == other {
+                return step;
+            }
+
+            frontier.push_back((Distance{val: 0}, step, step));
+        }
+
+        if frontier.len() == 1 {
+            return frontier.pop_front().unwrap().2;
+        }
+
+        while !frontier.is_empty() {
+            let (distance, next_step, first_step) = frontier.pop_front().unwrap();
+            let distance = distance.val + 1;
+            for i in 0..4 {
+                let adj = next_step.adjacent(i);
+                if adj == other {
+                    return first_step;
+                }
+                if walls[adj.y][adj.x] ||
+                   units.contains_key(&adj) ||
+                   explored.contains(&adj) {
+                    continue;
+                }
+                explored.insert(adj);
+                frontier.push_back( (Distance {val: distance}, adj, first_step) );
+            }
+        }
+
+        return self;
+    }
+
+    fn nearest_enemy(self, is_elf: bool, walls: &Vec<Vec<bool>>,
+                     units: &HashMap<GridPos, bool>) -> GridPos {
         // Dijkstra's since I'm feeling lazy
         let mut frontier = VecDeque::new();
         let mut explored = HashSet::new();
 
         frontier.push_back((Distance{val: 0}, self));
 
+        let mut finish_distance = std::usize::MAX;
+        let mut target = self;
         while !frontier.is_empty() {
             let (distance, next_step) = frontier.pop_front().unwrap();
-            explored.insert(next_step);
+
+            if distance.val > finish_distance {
+                break;
+            }
+
             let distance = distance.val + 1;
             for i in 0..4 {
                 let adj = next_step.adjacent(i);
-                if adj == other {
-                    return distance;
+
+                if units.contains_key(&adj) {
+                    if units[&adj] != is_elf &&
+                       (distance < finish_distance || adj < target) {
+                        target = adj;
+                        finish_distance = distance;
+                    }
+                    continue;
                 }
+
                 if walls[adj.y][adj.x] ||
-                   units.contains(&adj) ||
                    explored.contains(&adj) {
                     continue;
                 }
+                explored.insert(adj);
                 frontier.push_back( (Distance {val: distance}, adj) );
             }
         }
 
-        return 0;
+        return target;
     }
 }
 
@@ -156,86 +255,33 @@ fn next_step(actor: usize, actors: &mut HashMap<usize, Actor>,
              walls: &Vec<Vec<bool>>) -> GridPos {;
     let start: GridPos = actors[&actor].pos;
     let is_elf = actors[&actor].is_elf;
-    let mut actor_pos = HashSet::new();
+    let mut actor_pos = HashMap::new();
 
     for (_, actor) in actors.iter() {
         if actor.is_elf != is_elf && start.is_adjacent(actor.pos) {
             return start;
         }
-        actor_pos.insert(actor.pos);
+        actor_pos.insert(actor.pos, actor.is_elf);
     }
 
-    let mut closest = start;
-    let mut distance = 0;
-    for (_, actor) in actors {
-        if actor.is_elf == is_elf {
-            continue;
-        }
-        let pos = actor.pos;
+    let closest = start.nearest_enemy(is_elf, &walls, &actor_pos);
 
-        for i in 0..4 {
-            let target = pos.adjacent(i);
-
-            if start == target {
-                return start;
-            }
-
-            if walls[target.y][target.x] ||
-               actor_pos.contains(&target) {
-                continue;                
-            }
-
-            let path = start.pathfind(target, walls, &actor_pos);
-
-            if path == 0 {
-                continue;
-            }
-
-            if    distance == 0 || path < distance
-               || (path == distance && target < closest) {
-                closest = target;
-                distance = path;
-            }
-        }
-    }
-
-    if distance == 0 {
+    if closest == start {
         // No accessible targets found
         return start;
     }
 
-    let mut next_step = start;
-    let mut distance = 0;
-    for i in 0..4 {
-        let start = start.adjacent(i);
-        if    walls[start.y][start.x]
-           || actor_pos.contains(&start) {
-            continue;
-        }
-        if start == closest {
-            return start;
-        }
-        let path = start.pathfind(closest, walls, &actor_pos);
-
-        if path == 0 {
-            continue;
-        }
-
-        if     distance == 0 || distance > path
-            || (path == distance && start < next_step) {
-            next_step = start;
-            distance = path;
-        }
-    }
-
-    next_step
+    start.pathfind(closest, walls, &actor_pos)
 }
 
 fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
     -> (u32, i32) {
     let mut turn = 0;
 
+    let mut skip_movement = false;
+    let mut last_actors = HashSet::new();
     loop {
+
         let actor;
         {
             let next_actor = actors.iter()
@@ -244,8 +290,14 @@ fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
                                    .min();
 
             if next_actor == None {
-                println!("Turn {} done", turn);
                 turn += 1;
+
+                let mut actor_pos = HashSet::new();
+                for (_, actor) in actors.iter() {
+                    actor_pos.insert( (actor.pos, actor.is_elf) );
+                }
+                skip_movement = last_actors == actor_pos;
+                last_actors = actor_pos;
                 continue;
             }
 
@@ -256,7 +308,9 @@ fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
             break;
         }
 
-        let new_pos = next_step(actor, actors, walls);
+        let new_pos =
+            if !skip_movement { next_step(actor, actors, walls) }
+            else              { actors[&actor].pos };
         actors.entry(actor).and_modify(|a| a.pos = new_pos);
         actors.entry(actor).and_modify(|a| a.turn += 1);
         let elf_attacker = actors[&actor].is_elf;
