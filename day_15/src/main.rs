@@ -66,18 +66,34 @@ mod tests {
 
     #[test]
     fn test_first_half() {
-        //test_resolution(TEST_INPUT_1, (47, 590));
-        //test_resolution(TEST_INPUT_2, (37, 982));
-        //test_resolution(TEST_INPUT_3, (46, 859));
+        test_resolution(TEST_INPUT_1, (47, 590));
+        test_resolution(TEST_INPUT_2, (37, 982));
+        test_resolution(TEST_INPUT_3, (46, 859));
         test_resolution(TEST_INPUT_4, (35, 793));
-        //test_resolution(TEST_INPUT_5, (54, 536));
-        //test_resolution(TEST_INPUT_6, (20, 937));
+        test_resolution(TEST_INPUT_5, (54, 536));
+        test_resolution(TEST_INPUT_6, (20, 937));
+    }
+
+    #[test]
+    fn test_second_half() {
+        test_power(TEST_INPUT_1, (15, 29, 172));
+        test_power(TEST_INPUT_3, (4,  33, 948));
+        //test_power(TEST_INPUT_4, (15, 37, 94));
+        test_power(TEST_INPUT_5, (12, 39, 166));
+        test_power(TEST_INPUT_6, (34, 30, 38));
+    }
+
+    fn test_power(input: &str, expected: (i32, u32, i32)) {
+        let input = String::from(input);
+        let (walls, actors) = parse_input(input);
+        let power = find_winning_power(&walls, &actors);
+        assert_eq!(power, expected);
     }
 
     fn test_resolution(input: &str, expected: (u32, i32)) {
         let input = String::from(input);
         let (walls, mut actors) = parse_input(input);
-        assert_eq!(run(&walls, &mut actors), expected);
+        assert_eq!(run(&walls, &mut actors, 3), expected);
     }
 
     #[test]
@@ -188,7 +204,7 @@ impl GridPos {
         while !frontier.is_empty() {
             let (distance, next_step) = frontier.pop_front().unwrap();
 
-            if distance.val > finish_distance {
+            if distance.val >= finish_distance {
                 break;
             }
 
@@ -214,7 +230,7 @@ impl GridPos {
             }
         }
 
-        return target;
+        target
     }
 }
 
@@ -274,7 +290,8 @@ fn next_step(actor: usize, actors: &mut HashMap<usize, Actor>,
     start.pathfind(closest, walls, &actor_pos)
 }
 
-fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
+fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>,
+       elf_attack: i32)
     -> (u32, i32) {
     let mut turn = 0;
 
@@ -298,6 +315,7 @@ fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
                 }
                 skip_movement = last_actors == actor_pos;
                 last_actors = actor_pos;
+
                 continue;
             }
 
@@ -333,7 +351,9 @@ fn run(walls: &Vec<Vec<bool>>, actors: &mut HashMap<usize, Actor>)
 
         let target = target.unwrap();
 
-        actors.entry(target).and_modify(|a| a.hp -= 3);
+        let attack_power = if elf_attacker { elf_attack } else { 3 };
+
+        actors.entry(target).and_modify(|a| a.hp -= attack_power);
         if actors[&target].hp <= 0 {
             actors.remove(&target);
         }
@@ -373,6 +393,23 @@ fn parse_input(input: String) -> (Vec<Vec<bool>>, HashMap<usize, Actor>) {
     (walls, actors)
 }
 
+fn count_elves(actors: &HashMap<usize, Actor>) -> usize {
+    actors.iter().filter(|(_, a)| a.is_elf).count()
+}
+
+fn find_winning_power(walls: &Vec<Vec<bool>>,
+                      actors: &HashMap<usize, Actor>) -> (i32, u32, i32) {
+    let mut attack_power = 3;
+    loop {
+        let mut actors = actors.clone();
+        let elves = count_elves(&actors);
+        let (turn, total_hp) = run(walls, &mut actors, attack_power);
+        if elves == count_elves(&actors) {
+            return (attack_power, turn, total_hp);
+        }
+        attack_power += 1;
+    }
+}
 
 fn main() {
     let mut input = String::new();
@@ -380,7 +417,9 @@ fn main() {
     f.read_to_string(&mut input).expect("Failed to read input.");
 
     let (walls, mut actors) = parse_input(input);
-    let (turn, total_hp) = run(&walls, &mut actors);
+    let (power, turn_nl, hp_nl) = find_winning_power(&walls, &actors);
+    let (turn, total_hp) = run(&walls, &mut actors, 3);
     println!("Ended at turn {}, with a total HP of {}", turn, total_hp);
     println!("Product: {}", turn as i32 *total_hp);
+    println!("No losses at {} attack power with outcome of {}", power, turn_nl as i32*hp_nl);
 }
